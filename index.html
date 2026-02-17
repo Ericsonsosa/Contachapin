@@ -155,7 +155,6 @@
     <span><i class="fa fa-map-marker-alt" style="margin-right:6px;color:var(--gold2)"></i>Guatemala, Guatemala</span>
     <div class="tb-right">
       <span><i class="fa fa-phone" style="margin-right:5px;color:var(--gold2)"></i><a href="tel:+50235200000">+(502) 3520-0000</a></span>
-      <span><i class="fa fa-envelope" style="margin-right:5px;color:var(--gold2)"></i><a href="mailto:esosa@contachapin.com">info@contachapin.com</a></span>
     </div>
   </div>
 
@@ -204,7 +203,7 @@
             <li><i class="fa fa-briefcase"></i>+20 años de experiencia</li>
             <li><i class="fa fa-map-marker-alt"></i>Guatemala, Guatemala</li>
             <li><i class="fa fa-phone"></i>+(502) 3520-0000</li>
-            <li><i class="fa fa-envelope"></i>info@contachapin.com</li>
+            <li><i class="fa fa-envelope"></i><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="640d0a020b24070b0a1005070c05140d0a4a070b09">[email&#160;protected]</a></li>
           </ul>
           <a href="#contacto" class="card-cta">Agendar Cita Gratuita <i class="fa fa-arrow-right" style="margin-left:6px"></i></a>
         </div>
@@ -278,35 +277,40 @@
       <div class="contact-grid">
         <div class="contact-info-list">
           <div class="contact-item"><div class="contact-icon"><i class="fa fa-phone"></i></div><div><div class="contact-label">Telefono</div><div class="contact-val"><a href="tel:+50235200000">+(502) 3520-0000</a></div></div></div>
-          <div class="contact-item"><div class="contact-icon"><i class="fa fa-envelope"></i></div><div><div class="contact-label">Correo</div><div class="contact-val"><a href="mailto:esosa@contachapin.com">info@contachapin.com</a></div></div></div>
+          <div class="contact-item"><div class="contact-icon"><i class="fa fa-envelope"></i></div><div><div class="contact-label">Correo</div><div class="contact-val"><a href="/cdn-cgi/l/email-protection#90f9fef6ffd0f3fffee4f1f3f8f1e0f9febef3fffd"><span class="__cf_email__" data-cfemail="86efe8e0e9c6e5e9e8f2e7e5eee7f6efe8a8e5e9eb">[email&#160;protected]</span></a></div></div></div>
           <div class="contact-item"><div class="contact-icon"><i class="fab fa-whatsapp"></i></div><div><div class="contact-label">WhatsApp</div><div class="contact-val"><a href="https://wa.me/50235200000">+(502) 3520-0000</a></div></div></div>
           <div class="contact-item"><div class="contact-icon"><i class="fa fa-map-marker-alt"></i></div><div><div class="contact-label">Ubicacion</div><div class="contact-val" style="color:rgba(255,255,255,.8)">Guatemala, Guatemala</div></div></div>
           <div class="contact-item"><div class="contact-icon"><i class="fa fa-clock"></i></div><div><div class="contact-label">Horario</div><div class="contact-val" style="color:rgba(255,255,255,.8)">Lun-Vie: 8:00-17:00 hrs</div></div></div>
         </div>
         <div class="contact-form">
-          <div class="form-row">
-            <div class="form-group"><label>Nombre</label><input type="text" placeholder="Su nombre"></div>
-            <div class="form-group"><label>Empresa</label><input type="text" placeholder="Su empresa"></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>Telefono</label><input type="tel" placeholder="+(502)"></div>
-            <div class="form-group"><label>Correo</label><input type="email" placeholder="su@correo.com"></div>
-          </div>
-          <div class="form-group">
-            <label>Servicio de Interes</label>
-            <select>
-              <option value="">Seleccione...</option>
-              <option>Contabilidad General</option>
-              <option>Auditoria Financiera</option>
-              <option>Asesoria Fiscal / SAT</option>
-              <option>Analisis Financiero</option>
-              <option>Nomina y RRHH</option>
-              <option>Contabilidad Digital / Odoo</option>
-              <option>Otro</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Mensaje</label><textarea placeholder="Cuentenos sobre su empresa y que necesita..."></textarea></div>
-          <button class="btn-form" id="sendBtn"><i class="fa fa-paper-plane"></i> Enviar Mensaje</button>
+          <form id="contactForm" action="https://formspree.io/f/xwvnbdaz" method="POST">
+            <input type="hidden" name="_replyto" value="esosa@contachapin.com">
+            <input type="hidden" name="_subject" value="Nuevo mensaje desde ContaChapin.com">
+            <div class="form-row">
+              <div class="form-group"><label for="nombre">Nombre</label><input type="text" id="nombre" name="nombre" placeholder="Su nombre" required></div>
+              <div class="form-group"><label for="empresa">Empresa</label><input type="text" id="empresa" name="empresa" placeholder="Su empresa"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="telefono">Telefono</label><input type="tel" id="telefono" name="telefono" placeholder="+(502)"></div>
+              <div class="form-group"><label for="correo">Correo</label><input type="email" id="correo" name="email" placeholder="su@correo.com" required></div>
+            </div>
+            <div class="form-group">
+              <label for="servicio">Servicio de Interes</label>
+              <select id="servicio" name="servicio">
+                <option value="">Seleccione...</option>
+                <option>Contabilidad General</option>
+                <option>Auditoria Financiera</option>
+                <option>Asesoria Fiscal / SAT</option>
+                <option>Analisis Financiero</option>
+                <option>Nomina y RRHH</option>
+                <option>Contabilidad Digital / Odoo</option>
+                <option>Otro</option>
+              </select>
+            </div>
+            <div class="form-group"><label for="mensaje">Mensaje</label><textarea id="mensaje" name="mensaje" placeholder="Cuentenos sobre su empresa y que necesita..." required></textarea></div>
+            <button class="btn-form" id="sendBtn" type="submit"><i class="fa fa-paper-plane"></i> Enviar Mensaje</button>
+            <p id="formMsg" style="display:none;margin-top:12px;text-align:center;font-weight:600;"></p>
+          </form>
         </div>
       </div>
     </div>
@@ -321,8 +325,8 @@
         </div>
         <p>Mas de 20 años brindando soluciones contables con excelencia, etica y compromiso en Guatemala.</p>
         <div class="footer-socials">
-          <a href="https://www.facebook.com/contachapin/" class="social-btn"><i class="fab fa-facebook-f"></i></a>
-          <a href="https://www.instagram.com/contachapin/?hl=es" class="social-btn"><i class="fab fa-instagram"></i></a>
+          <a href="https://www.facebook.com/contachapin" class="social-btn"><i class="fab fa-facebook-f"></i></a>
+          <a href="https://www.instagram.com/contachapin" class="social-btn"><i class="fab fa-instagram"></i></a>
           <a href="https://wa.me/50235200000" class="social-btn"><i class="fab fa-whatsapp"></i></a>
           <a href="mailto:esosa@contachapin.com" class="social-btn"><i class="fa fa-envelope"></i></a>
         </div>
@@ -344,19 +348,55 @@
           <li><a href="#nosotros">Sobre Nosotros</a></li>
           <li><a href="#proceso">Nuestro Proceso</a></li>
           <li><a href="#contacto">Contacto</a></li>
-          <li><a href="https://contachapin.com/web/login">Portal del Cliente (Odoo)</a></li>
+          <li><a href="/web/login">Portal del Cliente (Odoo)</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <p>2025 ContaChapin - Ericson H. Sosa. Todos los derechos reservados.</p>
-      <p>Guatemala - <a href="https://contachapin.com/web/login">Acceso a Odoo</a></p>
+      <p>Guatemala - <a href="/web/login">Acceso a Odoo</a></p>
     </div>
   </footer>
 
   <a href="https://wa.me/50235200000" class="wa-float" target="_blank"><i class="fab fa-whatsapp"></i></a>
 
-  <script>
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    // Formulario de contacto via Formspree
+    var contactForm = document.getElementById('contactForm');
+    var formMsg = document.getElementById('formMsg');
+    var sendBtn = document.getElementById('sendBtn');
+    if (contactForm) {
+      contactForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando...';
+        fetch(contactForm.action, {
+          method: 'POST',
+          body: new FormData(contactForm),
+          headers: { 'Accept': 'application/json' }
+        }).then(function(res) {
+          if (res.ok) {
+            formMsg.style.display = 'block';
+            formMsg.style.color = '#E6B347';
+            formMsg.textContent = '✅ Mensaje enviado correctamente. Nos pondremos en contacto pronto.';
+            contactForm.reset();
+            sendBtn.innerHTML = '<i class="fa fa-check"></i> Enviado';
+          } else {
+            formMsg.style.display = 'block';
+            formMsg.style.color = '#ff6b6b';
+            formMsg.textContent = '❌ Hubo un error. Por favor intente de nuevo o escribanos directamente.';
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fa fa-paper-plane"></i> Enviar Mensaje';
+          }
+        }).catch(function() {
+          formMsg.style.display = 'block';
+          formMsg.style.color = '#ff6b6b';
+          formMsg.textContent = '❌ Error de conexion. Por favor intente de nuevo.';
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = '<i class="fa fa-paper-plane"></i> Enviar Mensaje';
+        });
+      });
+    }
     var toggle = document.getElementById('navToggle');
     var links = document.getElementById('navLinks');
     var icon = document.getElementById('toggleIcon');
@@ -372,26 +412,10 @@
     });
     var observer = new IntersectionObserver(function(entries) {
       entries.forEach(function(e) {
-        if (e.isIntersecting) { 
+        if (e.isIntersecting) {
           e.target.style.animation = 'fadeUp .6s ease forwards';
           observer.unobserve(e.target);
         }
       });
     }, { threshold: 0.12 });
-    document.querySelectorAll('.service-card, .why-item, .paso, .contact-item, .stat-box').forEach(function(el) {
-      el.style.opacity = '0';
-      observer.observe(el);
-    });
-    document.getElementById('sendBtn').addEventListener('click', function(e) {
-      e.preventDefault();
-      this.innerHTML = '<i class="fa fa-check"></i> Mensaje enviado!';
-      this.style.background = 'linear-gradient(135deg,#28a745,#20c957)';
-      var btn = this;
-      setTimeout(function() {
-        btn.innerHTML = '<i class="fa fa-paper-plane"></i> Enviar Mensaje';
-        btn.style.background = '';
-      }, 3000);
-    });
-  </script>
-</body>
-</html>
+    document.querySelectorAll('.service-card, .why-item, .paso, .contact-item, .stat-box').forEa
