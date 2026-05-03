@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extractor DTE → Excel</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0e1117;
+      --surface:  #161b27;
+      --border:   #252d3d;
+      --accent:   #3b82f6;
+      --accent2:  #22d3ee;
+      --success:  #10b981;
+      --warning:  #f59e0b;
+      --danger:   #ef4444;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --mono:     'DM Mono', monospace;
+      --sans:     'DM Sans', sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1000px;
+      margin-bottom: 36px;
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    .logo-box {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono);
+      font-size: 17px;
+      font-weight: 500;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .card {
+      width: 100%;
+      max-width: 1000px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 32px;
+      margin-bottom: 20px;
+    }
+
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 52px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(59,130,246,.06);
+    }
+    #drop-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+    #drop-zone h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    #drop-zone p  { font-size: 13px; color: var(--muted); }
+    #file-name    { margin-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--accent2); min-height: 18px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active   { transform: scale(.97); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-success  { background: var(--success); color: #fff; }
+
+    .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+
+    #progress-wrap { display: none; margin-top: 18px; }
+    .prog-bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    #prog-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .2s; border-radius: 3px; }
+    #prog-label { font-size: 12px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+
+    #stats { width: 100%; max-width: 1000px; display: none; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 18px;
+      flex: 1; min-width: 140px;
+      text-align: center;
+    }
+    .stat-chip .val { font-size: 22px; font-weight: 700; font-family: var(--mono); color: var(--accent2); }
+    .stat-chip .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+    .stat-chip.err .val { color: var(--danger); }
+
+    #table-section { display: none; }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th {
+      background: #1a2236;
+      padding: 9px 12px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--accent2);
+      position: sticky; top: 0;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+    td { padding: 8px 12px; font-family: var(--mono); font-size: 11px; vertical-align: top; }
+    td.text-col  { font-family: var(--sans); font-size: 12px; }
+    td.num-col   { color: var(--accent); }
+    td.price-col { color: var(--success); text-align: right; }
+    td.date-col  { color: var(--warning); }
+    td.muted-col { color: var(--muted); }
+
+    #log-section { display: none; }
+    #log-box {
+      background: #0a0e17;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      max-height: 160px;
+      overflow-y: auto;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .log-ok   { color: var(--success); }
+    .log-err  { color: var(--danger); }
+    .log-warn { color: var(--warning); }
+
+    .tipo-btn {
+      padding: 8px 22px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .tipo-btn:hover { border-color: var(--accent); color: var(--text); }
+    .tipo-btn.active {
+      border-color: var(--accent);
+      background: rgba(59,130,246,.12);
+      color: var(--accent2);
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+
+    .col-map {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 8px;
+    }
+    .col-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .col-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(59,130,246,.15);
+      color: var(--accent2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .col-src { color: var(--muted); font-size: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-box">DTE</div>
+  <div>
+    <h1>Extractor DTE → Excel</h1>
+    <p>Sube un ZIP con XMLs del SAT — genera tabla lista para importar</p>
+  </div>
+</header>
+
+<!-- COLUMN MAP INFO -->
+<div class="card">
+  <div class="section-title">Columnas que se exportarán al Excel</div>
+  <div class="col-map">
+    <div class="col-item"><span class="col-tag">partner_id</span><span class="col-src">← NombreReceptor</span></div>
+    <div class="col-item"><span class="col-tag">serie_fel</span><span class="col-src">← NumeroAutorizacion / Serie</span></div>
+    <div class="col-item"><span class="col-tag">numero_fel</span><span class="col-src">← NumeroAutorizacion / Numero</span></div>
+    <div class="col-item"><span class="col-tag">invoice_date</span><span class="col-src">← FechaHoraEmision (solo fecha)</span></div>
+    <div class="col-item"><span class="col-tag">invoice_line_ids/name</span><span class="col-src">← Descripcion (por línea)</span></div>
+    <div class="col-item"><span class="col-tag">invoice_line_ids/price_unit</span><span class="col-src">← PrecioUnitario (por línea)</span></div>
+    <div class="col-item"><span class="col-tag">ref</span><span class="col-src">← Serie-Numero (concatenado)</span></div>
+  </div>
+</div>
+
+<!-- UPLOAD CARD -->
+<div class="card">
+
+  <!-- TIPO SELECTOR -->
+  <div style="display:flex; gap:10px; margin-bottom:22px;">
+    <button class="tipo-btn active" id="btn-ventas" onclick="setTipo('ventas')">
+      🧾 Ventas
+    </button>
+    <button class="tipo-btn" id="btn-compras" onclick="setTipo('compras')">
+      🛒 Compras
+    </button>
+    <span id="tipo-hint" style="
+      align-self:center;
+      font-size:12px;
+      color:var(--muted);
+      font-family:var(--mono);
+      margin-left:6px;
+    ">partner_id ← NombreReceptor</span>
+  </div>
+
+  <div id="drop-zone">
+    <input type="file" id="file-input" accept=".zip" />
+    <span class="drop-icon">📦</span>
+    <h2>Arrastra tu archivo ZIP aquí</h2>
+    <p>o haz clic para buscarlo en tu computadora</p>
+    <div id="file-name"></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-process" disabled>⚡ Procesar XML</button>
+    <button class="btn btn-success"  id="btn-export"  style="display:none">📥 Descargar Excel</button>
+  </div>
+
+  <div id="progress-wrap">
+    <div class="prog-bar-bg"><div id="prog-bar"></div></div>
+    <div id="prog-label">Procesando…</div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div id="stats">
+  <div class="stat-chip"><div class="val" id="s-total">0</div><div class="lbl">Archivos XML</div></div>
+  <div class="stat-chip"><div class="val" id="s-docs">0</div><div class="lbl">Documentos OK</div></div>
+  <div class="stat-chip"><div class="val" id="s-rows">0</div><div class="lbl">Filas Excel</div></div>
+  <div class="stat-chip err"><div class="val" id="s-err">0</div><div class="lbl">Con errores</div></div>
+</div>
+
+<!-- TABLE PREVIEW -->
+<div class="card" id="table-section">
+  <div class="section-title">Vista previa</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>partner_id</th>
+          <th>serie_fel</th>
+          <th>numero_fel</th>
+          <th>invoice_date</th>
+          <th>invoice_line_ids/name</th>
+          <th style="text-align:right">invoice_line_ids/price_unit</th>
+          <th>ref</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="card" id="log-section">
+  <div class="section-title">Registro de procesamiento</div>
+  <div id="log-box"></div>
+</div>
+
+<script>
+  // ── STATE ───────────────────────────────────────────────────────────────────
+  let selectedFile = null;
+  let allRows = [];
+  let tipoActual = 'ventas'; // 'ventas' | 'compras'
+
+  function setTipo(t) {
+    tipoActual = t;
+    document.getElementById('btn-ventas').classList.toggle('active',  t === 'ventas');
+    document.getElementById('btn-compras').classList.toggle('active', t === 'compras');
+    document.getElementById('tipo-hint').textContent =
+      t === 'ventas'
+        ? 'partner_id \u2190 NombreReceptor'
+        : 'partner_id \u2190 NombreEmisor';
+    resetResults();
+  }
+
+  // ── ELEMENTS ────────────────────────────────────────────────────────────────
+  const dropZone     = document.getElementById('drop-zone');
+  const fileInput    = document.getElementById('file-input');
+  const fileNameEl   = document.getElementById('file-name');
+  const btnProcess   = document.getElementById('btn-process');
+  const btnExport    = document.getElementById('btn-export');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progBar      = document.getElementById('prog-bar');
+  const progLabel    = document.getElementById('prog-label');
+  const statsEl      = document.getElementById('stats');
+  const tableSection = document.getElementById('table-section');
+  const tableBody    = document.getElementById('table-body');
+  const logSection   = document.getElementById('log-section');
+  const logBox       = document.getElementById('log-box');
+  const sTotalEl     = document.getElementById('s-total');
+  const sDocsEl      = document.getElementById('s-docs');
+  const sRowsEl      = document.getElementById('s-rows');
+  const sErrEl       = document.getElementById('s-err');
+
+  // ── DRAG & DROP ─────────────────────────────────────────────────────────────
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+  function setFile(f) {
+    selectedFile = f;
+    fileNameEl.textContent = `📎 ${f.name}  (${(f.size / 1024).toFixed(1)} KB)`;
+    btnProcess.disabled = false;
+    resetResults();
+  }
+
+  function resetResults() {
+    allRows = [];
+    tableBody.innerHTML = '';
+    logBox.innerHTML = '';
+    statsEl.style.display   = 'none';
+    tableSection.style.display = 'none';
+    logSection.style.display   = 'none';
+    btnExport.style.display    = 'none';
+    progressWrap.style.display = 'none';
+    progBar.style.width = '0%';
+  }
+
+  // ── PROCESS ZIP ─────────────────────────────────────────────────────────────
+  btnProcess.addEventListener('click', processZip);
+
+  async function processZip() {
+    if (!selectedFile) return;
+    resetResults();
+    btnProcess.disabled = true;
+    progressWrap.style.display = 'block';
+    logSection.style.display   = 'block';
+
+    try {
+      const zip = await JSZip.loadAsync(selectedFile);
+
+      const xmlFiles = Object.values(zip.files).filter(f =>
+        !f.dir && f.name.toLowerCase().endsWith('.xml')
+      );
+
+      if (xmlFiles.length === 0) {
+        log('warn', 'No se encontraron archivos XML en el ZIP.');
+        btnProcess.disabled = false;
+        return;
+      }
+
+      log('ok', `ZIP cargado — ${xmlFiles.length} archivo(s) XML encontrado(s).`);
+
+      let errors = 0, docCount = 0;
+      allRows = [];
+
+      for (let i = 0; i < xmlFiles.length; i++) {
+        const entry = xmlFiles[i];
+        progBar.style.width = Math.round(((i + 1) / xmlFiles.length) * 100) + '%';
+        progLabel.textContent = `Procesando ${i + 1} / ${xmlFiles.length}: ${shortName(entry.name)}`;
+
+        try {
+          const xmlText = await entry.async('string');
+          const rows    = parseXML(xmlText);
+
+          if (rows.length === 0) {
+            log('warn', `Sin datos: ${shortName(entry.name)}`);
+          } else {
+            rows.forEach(r => allRows.push(r));
+            docCount++;
+            log('ok', `✓ ${shortName(entry.name)} → ${rows.length} fila(s)`);
+          }
+        } catch (err) {
+          errors++;
+          log('err', `✗ ${shortName(entry.name)}: ${err.message}`);
+        }
+      }
+
+      // Update stats
+      sTotalEl.textContent = xmlFiles.length;
+      sDocsEl.textContent  = docCount;
+      sRowsEl.textContent  = allRows.length;
+      sErrEl.textContent   = errors;
+      statsEl.style.display   = 'flex';
+
+      renderTable(allRows);
+      tableSection.style.display = 'block';
+
+      if (allRows.length > 0) {
+        btnExport.style.display = 'inline-flex';
+        progLabel.textContent = `✓ Listo — ${allRows.length} fila(s) listas para exportar.`;
+      } else {
+        progLabel.textContent = 'No se pudo extraer ningún dato.';
+      }
+
+    } catch (err) {
+      log('err', 'Error al abrir el ZIP: ' + err.message);
+      progLabel.textContent = 'Error al procesar el archivo.';
+    } finally {
+      btnProcess.disabled = false;
+    }
+  }
+
+  // ── XML PARSER ──────────────────────────────────────────────────────────────
+  function parseXML(xmlText) {
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(xmlText, 'application/xml');
+
+    if (doc.querySelector('parsererror')) throw new Error('XML mal formado');
+
+    const NS = 'http://www.sat.gob.gt/dte/fel/0.2.0';
+
+    // Universal element finder: namespace → plain → prefixed
+    function getEl(root, name) {
+      return root.getElementsByTagNameNS(NS, name)[0]
+          || root.querySelector(name)
+          || root.querySelector('dte\\:' + name)
+          || null;
+    }
+    function getEls(root, name) {
+      const r1 = [...root.getElementsByTagNameNS(NS, name)];
+      if (r1.length) return r1;
+      const r2 = [...root.querySelectorAll(name)];
+      if (r2.length) return r2;
+      return [...root.querySelectorAll('dte\\:' + name)];
+    }
+
+    // NumeroAutorizacion
+    const numAuth = getEl(doc, 'NumeroAutorizacion');
+    if (!numAuth) throw new Error('NumeroAutorizacion no encontrado');
+    const numero = (numAuth.getAttribute('Numero') || '').trim();
+    const serie  = (numAuth.getAttribute('Serie')  || '').trim();
+    const ref    = serie && numero ? `${serie}-${numero}` : '';
+
+    // Receptor (Ventas) o Emisor (Compras) → partner_id
+    let partnerId = '';
+    if (tipoActual === 'ventas') {
+      const receptorEl = getEl(doc, 'Receptor');
+      partnerId = receptorEl ? (receptorEl.getAttribute('NombreReceptor') || '').trim() : '';
+    } else {
+      const emisorEl = getEl(doc, 'Emisor');
+      partnerId = emisorEl ? (emisorEl.getAttribute('NombreEmisor') || '').trim() : '';
+    }
+
+    // FechaHoraEmision → solo la parte de fecha "YYYY-MM-DD"
+    const datosGenEl = getEl(doc, 'DatosGenerales');
+    let invoiceDate  = '';
+    if (datosGenEl) {
+      const raw = datosGenEl.getAttribute('FechaHoraEmision') || '';
+      invoiceDate = raw.split('T')[0]; // "2026-04-29"
+    }
+
+    // Items
+    const items = getEls(doc, 'Item');
+    if (items.length === 0) throw new Error('No se encontraron Items');
+
+    return items.map((item, idx) => {
+      const descripcion    = (getEl(item, 'Descripcion')    || {textContent: ''}).textContent.trim();
+      const precioRaw      = (getEl(item, 'PrecioUnitario') || {textContent: ''}).textContent.trim();
+      const precioNum      = precioRaw !== '' ? (parseFloat(precioRaw) ?? precioRaw) : '';
+
+      const isFirst = idx === 0;
+      return {
+        partner_id:                    isFirst ? partnerId   : '',
+        serie_fel:                     isFirst ? serie       : '',
+        numero_fel:                    isFirst ? numero      : '',
+        invoice_date:                  isFirst ? invoiceDate : '',
+        'invoice_line_ids/name':       descripcion,
+        'invoice_line_ids/price_unit': precioNum,
+        ref:                           isFirst ? ref         : '',
+      };
+    });
+  }
+
+  // ── TABLE PREVIEW ───────────────────────────────────────────────────────────
+  function renderTable(rows) {
+    tableBody.innerHTML = '';
+    rows.slice(0, 300).forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-col">${esc(r.partner_id)}</td>
+        <td class="num-col">${esc(r.serie_fel)}</td>
+        <td class="num-col">${esc(r.numero_fel)}</td>
+        <td class="date-col">${esc(r.invoice_date)}</td>
+        <td class="text-col">${esc(r['invoice_line_ids/name'])}</td>
+        <td class="price-col">${esc(String(r['invoice_line_ids/price_unit']))}</td>
+        <td class="muted-col">${esc(r.ref)}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+    if (rows.length > 300) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="7" style="color:var(--muted);text-align:center;padding:12px;font-size:12px;">
+        … y ${rows.length - 300} filas más — todas se incluirán en el Excel
+      </td>`;
+      tableBody.appendChild(tr);
+    }
+  }
+
+  // ── EXPORT EXCEL ────────────────────────────────────────────────────────────
+  btnExport.addEventListener('click', exportExcel);
+
+  function exportExcel() {
+    if (!allRows.length) { log('warn', 'No hay datos para exportar.'); return; }
+
+    try {
+      const COLS = [
+        'partner_id',
+        'serie_fel',
+        'numero_fel',
+        'invoice_date',
+        'invoice_line_ids/name',
+        'invoice_line_ids/price_unit',
+        'ref'
+      ];
+
+      // Build array-of-arrays: header + data
+      const wsData = [
+        COLS,
+        ...allRows.map(r => COLS.map(c => {
+          const v = r[c];
+          return (v !== undefined && v !== null) ? v : '';
+        }))
+      ];
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Column widths (characters)
+      ws['!cols'] = [
+        { wch: 40 },  // partner_id
+        { wch: 38 },  // serie_fel
+        { wch: 14 },  // numero_fel
+        { wch: 14 },  // invoice_date
+        { wch: 64 },  // invoice_line_ids/name
+        { wch: 24 },  // invoice_line_ids/price_unit
+        { wch: 48 },  // ref
+      ];
+
+      // Freeze header row
+      ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+      XLSX.utils.book_append_sheet(wb, ws, 'DTE');
+
+      const filename = `DTE_Exportado_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      // Blob + enlace oculto: funciona en file:// en Mac (Safari y Chrome)
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url   = URL.createObjectURL(blob);
+      const a     = document.createElement('a');
+      a.href      = url;
+      a.download  = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+
+      log('ok', `📥 "${filename}" descargado — ${allRows.length} filas exportadas.`);
+    } catch (err) {
+      log('err', 'Error al generar el Excel: ' + err.message);
+    }
+  }
+
+  // ── HELPERS ─────────────────────────────────────────────────────────────────
+  function log(type, msg) {
+    const line = document.createElement('div');
+    line.className = `log-${type}`;
+    line.textContent = `[${new Date().toLocaleTimeString('es-GT')}] ${msg}`;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function shortName(p) { return p.split(/[\\/]/).pop(); }
+</script>
+</body>
+</html>
