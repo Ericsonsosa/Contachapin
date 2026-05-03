@@ -612,212 +612,243 @@
     }
   }
 
-  // ── TILDE CORRECTION (Dictionary + LanguageTool) ────────────────────────────
+  // ── TILDE CORRECTION — Hunspell ES + diccionario DTE GT ────────────────────
+  // Estrategia:
+  //  1. Diccionario propio: apellidos GT + palabras DTE (instantáneo)
+  //  2. Hunspell ES via nspell (80 000+ palabras, carga una sola vez)
+  //  3. LanguageTool API pública (fallback si Hunspell no resuelve)
   btnAi.addEventListener('click', fixTildes);
 
-  // ── Diccionario local: apellidos, nombres y palabras frecuentes en DTE GT ──
-  const DICT = new Set([
-    // Apellidos más comunes en Guatemala
+  // ── Diccionario propio GT (apellidos + palabras DTE frecuentes) ─────────────
+  const DICT_GT = new Set([
+    // ── Apellidos mayas y ladinos de Guatemala ───────────────────────────────
     'ABAC','ACABAL','ACAJABÓN','ACAL','ACEVEDO','AGUILAR','AGUILERA','AGUIRRE',
-    'AJANEL','AJCÁ','AJCAC','AJCHÉ','AJCOJÓM','AJIATAZ','AJÍN','AJIQUÍN',
-    'AJPACAJÁ','AJPOP','AJQUEJAY','AJQUÍ','AJSIVINAC','AJTZALAM','AJTZIB',
+    'AJANEL','AJCÁ','AJCAC','AJCHÉ','AJCOJÓM','AJÍN','AJIQUÍN','AJPACAJÁ',
+    'AJPOP','AJQUEJAY','AJQUÍ','AJSIVINAC','AJTZALAM','AJTZIB','AJÚ',
     'ALARCÓN','ALBIZÚREZ','ALDANA','ALVARADO','ÁLVAREZ','AMÉZQUITA',
-    'AJÚ','AJÚ','ARANDA','ARANGO','ARANA','ARÉVALO','ARGUETA','ARIAS',
-    'ARRIAGA','ARROYO','ASICONA','ASTURIAS','ATANASIO','AYALA','AZURDIA',
+    'ARANDA','ARANGO','ARANA','ARÉVALO','ARGUETA','ARIAS','ARRIAGA','ARROYO',
+    'ASICONA','ASTURIAS','AYALA','AZURDIA',
     'BAEZA','BARILLAS','BARQUÍN','BARRERA','BARRIENTOS','BARRIOS','BATÚN',
-    'BAUTISTA','BAXÍN','BAZA','BAZAN','BAZÁN','BENITO','BERMÚDEZ',
-    'BOCH','BOLVITO','BRAN','BRAVO','BÚCARO',
+    'BAUTISTA','BAXÍN','BAZÁN','BERMÚDEZ','BRAVO','BÚCARO',
     'CABAÑAS','CABRERA','CÁCERES','CALDERÓN','CALÍ','CAMEY','CAMPOSECO',
-    'CAMPOSECO','CANEL','CARÍAS','CARRILLO','CASASOLA','CASILLO','CASTELLANOS',
-    'CASTILLO','CASTRO','CAÚ','CAXAJ','CAYAX','CEBALLOS','CEDILLO','CELADA',
-    'CHACACH','CHACÓN','CHALÍ','CHAMÁM','CHAMORRO','CHÁVEZ','CHICHÉ',
-    'CHILÍN','CHUMIL','CIFUENTES','COJOM','COJULÚN','COLINDRES','COLOCH',
-    'COLOP','COMÁN','CONTRERAS','COPA','CORADO','CORONADO','CORTÉS',
-    'COY','COYOTE','COZAL','CÚMEZ','CURRUCHICHE','CURRUCHICH',
-    'DE LA CRUZ','DE LEÓN','DEL AGUILA','DEL CÍD','DELGADO','DÍAZ',
+    'CANEL','CARÍAS','CARRILLO','CASASOLA','CASTELLANOS','CASTILLO','CASTRO',
+    'CAÚ','CEBALLOS','CEDILLO','CELADA','CHACACH','CHACÓN','CHALÍ',
+    'CHAMÁM','CHAMORRO','CHÁVEZ','CHICHÉ','CHILÍN','CHUMIL','CIFUENTES',
+    'COJOM','COJULÚN','COLINDRES','COLOCH','COLOP','COMÁN','CONTRERAS',
+    'CORADO','CORONADO','CORTÉS','CURRUCHICH','CURRUCHICHE',
+    'CABNAL','CAAL','CACH','CALACHIJ','CANTÉ','CATU','CAXAJ','CAYAX',
+    'COCÓN','COJTÍ','CUC','CÚMEZ','CUXUM',
+    'DE LA CRUZ','DE LEÓN','DEL ÁGUILA','DELGADO','DÍAZ',
     'DOMINGO','DONIS','DUEÑAS',
     'ECHEVERRÍA','ELÍAS','ENRÍQUEZ','ESCOBAR','ESPAÑA','ESPINOZA',
     'ESQUIT','ESTRADA',
     'FAJARDO','FARFÁN','FELICIANO','FERNÁNDEZ','FIGUEROA','FLORES',
     'FUENTES','FÚNEZ',
-    'GALINDO','GALLARDO','GALLEGO','GÁLVEZ','GAMBOA','GARRIDO',
-    'GIRÓN','GODÍNEZ','GÓMEZ','GÓNZALEZ','GONZÁLES','GONZÁLEZ',
-    'GRAMAJO','GARCÍA','GUARCAX','GUARCHAJ','GUDIEL','GUERRA',
-    'GUTIÉRREZ','GUZMÁN',
+    'GALINDO','GALLARDO','GALLEGO','GÁLVEZ','GAMBOA','GARRIDO','GIRÓN',
+    'GODÍNEZ','GÓMEZ','GONZÁLEZ','GRAMAJO','GARCÍA','GUARCAX','GUARCHAJ',
+    'GUDIEL','GUERRA','GUTIÉRREZ','GUZMÁN',
     'HERRERA','HERNÁNDEZ','HIGUEROS','HIDALGO',
     'ICAL','IXCOT','IXCOY','IXMATÁ',
     'JIMÉNEZ','JUÁREZ',
     'LAÍNEZ','LEAL','LEIVA','LEMUS','LIMA','LINARES','LIRA',
-    'LONGO','LÓPEZ','LORENZANA','LUCRECIA','LUNA',
+    'LÓPEZ','LORENZANA','LUNA',
     'MALDONADO','MARROQUÍN','MÁRTIR','MARTÍNEZ','MAZARIEGOS',
     'MEDINA','MEJÍA','MÉNDEZ','MENDIZÁBAL','MENÉNDEZ','MÉRIDA',
     'MICULAX','MIJANGOS','MOLINA','MONROY','MONTEJO','MONTERROSO',
-    'MONTÚFAR','MONZÓN','MORALES','MORÁN','MORENO','MOSCOSO',
-    'MUÑOZ',
+    'MONTÚFAR','MONZÓN','MORALES','MORÁN','MORENO','MOSCOSO','MUÑOZ',
     'NÁJERA','NAVARRO','NIMATUJ','NORIEGA','NÚÑEZ',
-    'OCHOA','OROZCO','ORELLANA','ORDÓÑEZ','ORTEGA','ORTÍZ',
-    'OSORIO','OVALLE',
-    'PABLO','PACHECO','PALENCIA','PALMA','PAREDES','PARDO',
-    'PAZ','PÉREZ','PINEDA','PIRIR','PONCE','PORRAS','PRADO',
-    'PUAC',
+    'OCHOA','OROZCO','ORELLANA','ORDÓÑEZ','ORTEGA','ORTÍZ','OSORIO','OVALLE',
+    'PABLO','PACHECO','PALENCIA','PALMA','PAREDES','PARDO','PAZ','PÉREZ',
+    'PINEDA','PIRIR','PONCE','PORRAS','PRADO','PUAC',
     'QUICHÉ','QUIJADA','QUIÑÓNEZ','QUIROA',
-    'RAMÍREZ','RAMOS','RECINOS','REINA','REYES','RÍOS',
-    'RIVAS','RIVERA','RODAS','RODRÍGUEZ','ROJAS','ROMERO',
-    'ROSALES','RUANO','RUBIO','RUÍZ',
-    'SAGASTUME','SALAZAR','SALGUERO','SAMAYOA','SÁNCHEZ',
-    'SANTOS','SARAVIA','SICAJÁ','SIGÜENZA','SIMILOX',
-    'SOLANO','SOLARES','SOLÍS','SOLORZANO','SOTO','SOLÓRZANO',
-    'TÁNCHEZ','TELLO','TICAS','TOLEDO','TOBAR','TOVAR',
-    'TZI','TZOC','TZUL','TZUNÚN','TZUNUNÉ',
+    'RAMÍREZ','RAMOS','RECINOS','REINA','REYES','RÍOS','RIVAS','RIVERA',
+    'RODAS','RODRÍGUEZ','ROJAS','ROMERO','ROSALES','RUANO','RUBIO','RUÍZ',
+    'SAGASTUME','SALAZAR','SALGUERO','SAMAYOA','SÁNCHEZ','SANTOS','SARAVIA',
+    'SICAJÁ','SIGÜENZA','SIMILOX','SOLANO','SOLARES','SOLÍS','SOLÓRZANO',
+    'SOTO','SUCHITÉ',
+    'TÁNCHEZ','TELLO','TICAS','TOLEDO','TOBAR','TOVAR','TZOC','TZUL',
+    'TZUNÚN','TZUNUNÉ',
     'UMAÑA','URÍZAR','URQUIZÚ',
-    'VALLE','VÁSQUEZ','VANEGAS','VARGAS','VEGA','VELÁSQUEZ',
-    'VELIZ','VENTURA','VILLAGRÁN','VILLANUEVA','VILLATORO',
-    'XEC','XICARÁ','XUYÁ',
-    'YAT','YAX','YAXÓN',
+    'VALLE','VÁSQUEZ','VANEGAS','VARGAS','VEGA','VELÁSQUEZ','VELIZ',
+    'VENTURA','VILLAGRÁN','VILLANUEVA','VILLATORO',
+    'XEC','XICARÁ','XUYÁ','YAT','YAX','YAXÓN',
     'ZAPETA','ZELAYA','ZÚÑIGA',
-    // Palabras comunes en descripciones de DTE
+    // ── Palabras comunes en descripciones DTE ────────────────────────────────
     'ADMINISTRACIÓN','AGRÍCOLA','ALQUILER','ATRASO','ANÓNIMA',
-    'COBRO','COMERCIAL','COMERCIALIZACIÓN','COMISIÓN',
-    'COMPAÑÍA','CONSTRUCCIÓN','CONTRIBUCIÓN','CUOTA',
+    'COBRO','COMERCIAL','COMERCIALIZACIÓN','COMISIÓN','COMPAÑÍA',
+    'CONSTRUCCIÓN','CONTRIBUCIÓN','CUOTA',
     'DESCRIPCIÓN','DISTRIBUCIÓN','DISTRIBUIDORA',
     'ELÉCTRICA','EMPRESA','EXPORTACIÓN','EXPORTACIONES',
     'FACTURA','FINANCIERO','FUNCIÓN',
     'GESTIÓN','HONORARIOS',
     'IMPORTACIÓN','IMPORTACIONES','INDUSTRIAL','INDUSTRIA','INFORMACIÓN',
     'INTERÉS','INSCRIPCIÓN',
-    'JURISDICCIÓN',
     'LIMITADA','LOGÍSTICA',
     'MANTENIMIENTO','MENSUALIDAD','MÍNIMO',
     'OPERACIÓN','ORGANIZACIÓN',
-    'PENSIÓN','PENDIENTE','PRODUCCIÓN','PROFESIÓN',
+    'PENSIÓN','PENDIENTE','PRODUCCIÓN',
     'RECEPCIÓN','RECIBO','RENTA','RESPONSABILIDAD',
     'SALDO','SERVICIOS','SERVICIO','SOCIEDAD','SUSCRIPCIÓN',
-    'TÉCNICO','TELECOMUNICACIONES','TRANSACCIÓN','TRANSPORTE',
+    'TÉCNICO','TÉCNICA','TELECOMUNICACIONES','TRANSACCIÓN','TRANSPORTE',
     'VEHÍCULO','VENTAS',
-    // Conectores y palabras frecuentes
-    'TAMBIÉN','ADEMÁS','SEGÚN','TRAVÉS','NÚMERO',
-    'MÁS','ESTÁ','AÚN','AHÍ','ASÍ','AQUí','AQUÍ',
-    // Tipos de empresa abreviados
-    'S.A.','LTDA.','S.R.L.','CIA.','CÍAS.',
+    // ── Palabras españolas de alta frecuencia con tilde ───────────────────
+    'TAMBIÉN','ADEMÁS','SEGÚN','TRAVÉS','NÚMERO','MÁS','ESTÁ',
+    'AQUÍ','ASÍ','AHÍ','AÚN','DESPUÉS','PÁGINA','ÁREA','CÓDIGO',
+    'PERÍODO','ÚLTIMO','ÚNICO','PÚBLICO','BÁSICO','ECONÓMICO',
+    'TELÉFONO','ESPECÍFICO','PRÓXIMO','DÉBITO','CRÉDITO',
+    'PRÉSTAMO','MÓDULO','RÉGIMEN','CÁMARA','ÍNDICE',
+    'ÁNGULO','ÁNIMO','ÁRBOL','ÁTICO','ÁVIDO',
+    'ÉNFASIS','ÉPOCA','ÉXITO','ÉTNICO',
+    'ÍCONO','ÍNTIMO','ÍDOLO',
+    'ÓPTICO','ÓPTIMO','ÓRGANO','OCÉANO',
+    'ÚTIL','ÚNICO',
   ]);
 
-  // Caracteres candidatos para sustituir "?"
-  // Ordenados por frecuencia en español guatemalteco
-  const ACCENT_UPPER = ['Á','É','Í','Ó','Ú','Ñ','Ü'];
-  const ACCENT_LOWER = ['á','é','í','ó','ú','ñ','ü'];
-  const ACCENT_OTHER = ['¿','¡','«','»'];
+  // ── nspell (Hunspell JS) — se carga una vez desde CDN ───────────────────────
+  let nspellChecker = null;
+  let nspellLoading = false;
 
-  // Genera todos los candidatos sustituyendo cada "?" con acentuadas
-  function generarCandidatos(word) {
-    const isUpper = word === word.toUpperCase();
-    const chars   = isUpper ? ACCENT_UPPER : ACCENT_LOWER;
-    let results   = [word];
-
-    const qCount = (word.match(/\?/g) || []).length;
-    for (let q = 0; q < qCount; q++) {
-      const next = [];
-      for (const base of results) {
-        for (const ch of chars) {
-          next.push(base.replace('?', ch));
-        }
-        // También probar sin tilde (podría ser solo un carácter perdido no acentuado)
-        next.push(base.replace('?', ''));
-      }
-      results = next;
-      if (results.length > 2000) break; // límite de explosión combinatoria
+  async function getNspell() {
+    if (nspellChecker) return nspellChecker;
+    if (nspellLoading) {
+      // Esperar hasta que cargue
+      while (!nspellChecker) await sleep(100);
+      return nspellChecker;
     }
-    return [...new Set(results)];
-  }
-
-  // Busca en el diccionario local la mejor corrección para una palabra
-  function buscarEnDiccionario(word) {
-    const upper = word.toUpperCase();
-    // Sin ?
-    if (!word.includes('?')) return word;
-    const candidatos = generarCandidatos(word);
-    // Primero buscar exacto en el diccionario
-    for (const c of candidatos) {
-      if (DICT.has(c.toUpperCase())) return c;
-    }
-    return null; // no encontrado
-  }
-
-  // Valida una palabra con LanguageTool (API gratuita, sin clave)
-  async function validarConLT(candidatos, idioma = 'es') {
-    // Probar candidatos de a varios en un solo llamado a LT
-    // mandamos el texto: cada candidato separado por salto de línea
-    const texto = candidatos.join('\n');
+    nspellLoading = true;
     try {
-      const resp = await fetch('https://api.languagetool.org/v2/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `text=${encodeURIComponent(texto)}&language=${idioma}&disabledRules=UPPERCASE_SENTENCE_START`
-      });
-      if (!resp.ok) return null;
-      const data = await resp.json();
+      // Cargar nspell desde CDN
+      await loadScript('https://unpkg.com/nspell@2/index.min.js');
 
-      // Encontrar candidatos sin errores de ortografía
-      const erroresPorLinea = new Array(candidatos.length).fill(0);
-      for (const match of (data.matches || [])) {
-        // calcular en qué línea cae el offset
-        let offset = 0;
-        for (let i = 0; i < candidatos.length; i++) {
-          if (match.offset >= offset && match.offset < offset + candidatos[i].length) {
-            erroresPorLinea[i]++;
-            break;
-          }
-          offset += candidatos[i].length + 1; // +1 por el \n
-        }
-      }
-      // Retornar el candidato con menos errores
-      let minErr = Infinity, best = null;
-      for (let i = 0; i < candidatos.length; i++) {
-        if (erroresPorLinea[i] < minErr) {
-          minErr = erroresPorLinea[i];
-          best   = candidatos[i];
-        }
-      }
-      return best;
-    } catch {
+      // Descargar diccionario Hunspell español (aff + dic)
+      const [affResp, dicResp] = await Promise.all([
+        fetch('https://cdn.jsdelivr.net/npm/dictionary-es@2/index.aff'),
+        fetch('https://cdn.jsdelivr.net/npm/dictionary-es@2/index.dic'),
+      ]);
+      if (!affResp.ok || !dicResp.ok) throw new Error('No se pudo cargar el diccionario Hunspell ES');
+
+      const aff = await affResp.text();
+      const dic = await dicResp.text();
+
+      // nspell expuesto globalmente tras loadScript
+      nspellChecker = nspell({ aff, dic });
+      log('ok', '📚 Diccionario Hunspell ES cargado (' + dic.split('\n').length.toLocaleString() + ' entradas).');
+      return nspellChecker;
+    } catch (e) {
+      log('warn', 'Hunspell no disponible: ' + e.message + '. Se usará LanguageTool como alternativa.');
+      nspellLoading = false;
       return null;
     }
   }
 
-  // Función principal: corrige un texto completo (puede ser una frase o nombre)
-  async function corregirTexto(texto, usarLT) {
-    if (!texto.includes('?')) return texto;
-
-    // Procesar palabra por palabra
-    const partes = texto.split(/(\s+)/);
-    const resultado = [];
-
-    for (const parte of partes) {
-      if (!parte.includes('?')) { resultado.push(parte); continue; }
-
-      // 1. Buscar en diccionario local
-      const dMatch = buscarEnDiccionario(parte);
-      if (dMatch) { resultado.push(dMatch); continue; }
-
-      // 2. Fallback: LanguageTool (si está habilitado)
-      if (usarLT) {
-        const candidatos = generarCandidatos(parte).slice(0, 30); // limitar a 30
-        const ltMatch = await validarConLT(candidatos);
-        if (ltMatch) { resultado.push(ltMatch); continue; }
-      }
-
-      // 3. Último recurso: heurística (vocal más frecuente en español)
-      // á→A, é→E, etc. — reemplazar ? con la vocal más probable según posición
-      resultado.push(parte.replace(/\?/g, (_, offset, str) => {
-        const isUp = str === str.toUpperCase();
-        // Consonante antes → probable vocal con tilde
-        const prev = str[offset - 1] || '';
-        if (/[bcdfghjklmnñpqrstvwxyz]/i.test(prev)) return isUp ? 'Á' : 'á';
-        return isUp ? 'Ó' : 'ó';
-      }));
-    }
-    return resultado.join('');
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+      const s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
   }
 
+  // ── Candidatos: sustituir cada "?" con vocales acentuadas ────────────────────
+  // Orden de prioridad basado en frecuencia en español
+  const ACCENT_UPPER = ['É','Í','Ó','Á','Ú','Ñ','Ü'];
+  const ACCENT_LOWER = ['é','í','ó','á','ú','ñ','ü'];
+
+  function generarCandidatos(word) {
+    const isUpper = word === word.toUpperCase();
+    const chars   = isUpper ? ACCENT_UPPER : ACCENT_LOWER;
+    let results   = [word];
+    const qCount  = (word.match(/\?/g) || []).length;
+    for (let q = 0; q < qCount; q++) {
+      const next = [];
+      for (const base of results) {
+        for (const ch of chars) next.push(base.replace('?', ch));
+      }
+      results = next;
+      if (results.length > 1500) break;
+    }
+    return [...new Set(results)];
+  }
+
+  // ── Validar con Hunspell (síncrono una vez cargado) ──────────────────────────
+  function hunspellOk(checker, word) {
+    if (!checker) return false;
+    // Hunspell trabaja con minúsculas; probar ambas formas
+    return checker.correct(word) ||
+           checker.correct(word.toLowerCase()) ||
+           checker.correct(word.charAt(0) + word.slice(1).toLowerCase());
+  }
+
+  // ── Validar con LanguageTool (API pública, sin clave) ────────────────────────
+  async function ltOk(word) {
+    try {
+      const resp = await fetch('https://api.languagetool.org/v2/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          text: word, language: 'es',
+          disabledRules: 'UPPERCASE_SENTENCE_START,WHITESPACE_RULE'
+        })
+      });
+      const d = await resp.json();
+      return !d.matches.some(m => m.rule?.issueType === 'misspelling');
+    } catch { return false; }
+  }
+
+  // ── Corregir una sola palabra ─────────────────────────────────────────────────
+  async function fixWord(word, checker) {
+    if (!word.includes('?')) return word;
+
+    // 1. Diccionario propio (instantáneo)
+    const upper = word.toUpperCase();
+    const candidatos = generarCandidatos(word);
+    for (const c of candidatos) {
+      if (DICT_GT.has(c.toUpperCase())) return c;
+    }
+
+    // 2. Hunspell (80 000+ palabras españolas)
+    if (checker) {
+      for (const c of candidatos) {
+        if (hunspellOk(checker, c)) return c;
+      }
+      // Pedir sugerencias de Hunspell para la versión sin ? (sustituida con placeholder)
+      // Tomar el candidato cuyas sugerencias Hunspell sean el mismo o vacías
+    }
+
+    // 3. LanguageTool API (para lo que Hunspell tampoco resuelva)
+    for (const c of candidatos.slice(0, 20)) {
+      await sleep(80);
+      if (await ltOk(c)) return c;
+    }
+
+    // 4. Heurística: posición en la sílaba
+    return word.replace(/\?/g, (_, offset, str) => {
+      const isUp = str === str.toUpperCase();
+      const prev = str[offset - 1] || '';
+      const next = str[offset + 1] || '';
+      if (/[bcdfghjklmnpqrstvwxyz]/i.test(prev) && /[bcdfghjklmnpqrstvwxyz]/i.test(next))
+        return isUp ? 'É' : 'é';   // entre consonantes → É es lo más común
+      if (/[bcdfghjklmnpqrstvwxyz]/i.test(prev))
+        return isUp ? 'Í' : 'í';   // vocal final de palabra
+      return isUp ? 'Á' : 'á';
+    });
+  }
+
+  // ── Corregir texto completo (frase o nombre) ─────────────────────────────────
+  async function fixTexto(texto, checker) {
+    if (!texto.includes('?')) return texto;
+    const partes = texto.split(/(\s+)/);
+    const out = [];
+    for (const p of partes) {
+      out.push(p.includes('?') ? await fixWord(p, checker) : p);
+    }
+    return out.join('');
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Función principal ────────────────────────────────────────────────────────
   async function fixTildes() {
     const campos = ['partner_id', 'invoice_line_ids/name'];
     const uniqSet = new Set();
@@ -829,32 +860,28 @@
     if (uniqSet.size === 0) { log('ok', 'No se detectaron caracteres corruptos.'); return; }
 
     btnAi.disabled = true;
-    btnAi.textContent = '⏳ Corrigiendo…';
-    log('ok', `Corrigiendo ${uniqSet.size} texto(s) únicos con diccionario + LanguageTool…`);
+    btnAi.textContent = '⏳ Cargando diccionario…';
+
+    // Cargar Hunspell en paralelo mientras mostramos estado
+    const checker = await getNspell();
+
+    log('ok', `Corrigiendo ${uniqSet.size} texto(s)… [Diccionario GT → Hunspell ES → LanguageTool]`);
+    btnAi.textContent = `⏳ 0/${uniqSet.size}`;
 
     const mapa = {};
     const textos = [...uniqSet];
-    let ltUsado = 0;
+    let dictUsed = 0, hunspellUsed = 0, ltUsed = 0;
 
     for (let i = 0; i < textos.length; i++) {
-      const original = textos[i];
-      btnAi.textContent = `⏳ ${i + 1}/${textos.length}…`;
+      const orig = textos[i];
+      btnAi.textContent = `⏳ ${i + 1}/${textos.length}`;
 
-      // Intentar primero solo diccionario (rápido)
-      let corregido = await corregirTexto(original, false);
-
-      // Si aún quedan ?, usar LanguageTool como refuerzo
-      if (corregido.includes('?')) {
-        corregido = await corregirTexto(original, true);
-        ltUsado++;
-        // Pausa mínima para no saturar la API de LT
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      mapa[original] = corregido;
+      // Determinar qué método se usó rastreando hit
+      const beforeDict = DICT_GT.has; // siempre true, usamos flag interno
+      const corr = await fixTexto(orig, checker);
+      mapa[orig] = corr;
     }
 
-    // Aplicar correcciones
     let fixedCount = 0;
     allRows = allRows.map(r => {
       const nr = { ...r };
@@ -867,7 +894,7 @@
 
     renderTable(allRows);
     btnAi.style.display = 'none';
-    log('ok', `✅ ${fixedCount} campo(s) corregido(s). Diccionario: ${textos.length - ltUsado}, LanguageTool: ${ltUsado}.`);
+    log('ok', `✅ ${fixedCount} campo(s) corregido(s) en ${textos.length} texto(s) únicos.`);
   }
 
   // ── EXPORT EXCEL ────────────────────────────────────────────────────────────
