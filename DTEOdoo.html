@@ -110,6 +110,8 @@
     .btn:disabled { opacity: .4; cursor: not-allowed; }
     .btn-primary  { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
     .btn-success  { background: var(--success); color: #fff; }
+    .btn-ai       { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; }
+    .btn-ai:disabled { opacity: .4; cursor: not-allowed; }
 
     .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 
@@ -287,7 +289,9 @@
 
   <div class="actions">
     <button class="btn btn-primary" id="btn-process" disabled>⚡ Procesar XML</button>
-    <button class="btn btn-success"  id="btn-export"  style="display:none">📥 Descargar Excel</button>
+    <button class="btn btn-ai"      id="btn-ai"      style="display:none">🔧 Corregir tildes</button>
+    <button class="btn btn-success" id="btn-export"  style="display:none">📥 Descargar Excel</button>
+  </div>
   </div>
 
   <div id="progress-wrap">
@@ -354,6 +358,8 @@
   const fileNameEl   = document.getElementById('file-name');
   const btnProcess   = document.getElementById('btn-process');
   const btnExport    = document.getElementById('btn-export');
+  const btnAi       = document.getElementById('btn-ai');
+  const apikeyWrap  = { style: {} }; // placeholder
   const progressWrap = document.getElementById('progress-wrap');
   const progBar      = document.getElementById('prog-bar');
   const progLabel    = document.getElementById('prog-label');
@@ -393,6 +399,7 @@
     tableSection.style.display = 'none';
     logSection.style.display   = 'none';
     btnExport.style.display    = 'none';
+    btnAi.style.display        = 'none';
     progressWrap.style.display = 'none';
     progBar.style.width = '0%';
   }
@@ -431,7 +438,7 @@
         progLabel.textContent = `Procesando ${i + 1} / ${xmlFiles.length}: ${shortName(entry.name)}`;
 
         try {
-          const xmlText = await entry.async('string');
+          const xmlText = await readXmlWithEncoding(entry);
           const rows    = parseXML(xmlText);
 
           if (rows.length === 0) {
@@ -459,6 +466,17 @@
 
       if (allRows.length > 0) {
         btnExport.style.display = 'inline-flex';
+
+        // Mostrar botón IA solo si hay textos con ?
+        const hayCorruptos = allRows.some(r =>
+          String(r.partner_id).includes('?') ||
+          String(r['invoice_line_ids/name']).includes('?')
+        );
+        if (hayCorruptos) {
+          btnAi.style.display   = 'inline-flex';
+          log('warn', `⚠️ Se detectaron caracteres corruptos (?). Usa "✨ Corregir tildes con IA" para repararlos.`);
+        }
+
         progLabel.textContent = `✓ Listo — ${allRows.length} fila(s) listas para exportar.`;
       } else {
         progLabel.textContent = 'No se pudo extraer ningún dato.';
@@ -469,6 +487,32 @@
       progLabel.textContent = 'Error al procesar el archivo.';
     } finally {
       btnProcess.disabled = false;
+    }
+  }
+
+  // ── ENCODING-AWARE XML READER ────────────────────────────────────────────────
+  // Lee el archivo como bytes, detecta el encoding declarado en el XML
+  // (ISO-8859-1, Windows-1252, UTF-8, etc.) y decodifica correctamente.
+  async function readXmlWithEncoding(zipEntry) {
+    const bytes = await zipEntry.async('uint8array');
+
+    // Peek at first 200 bytes as ASCII to find the encoding declaration
+    const peek = String.fromCharCode(...bytes.slice(0, 200));
+    const match = peek.match(/encoding\s*=\s*["']([^"']+)["']/i);
+    let encoding = match ? match[1].toLowerCase() : 'utf-8';
+
+    // Normalizar aliases comunes
+    if (encoding === 'iso-8859-1' || encoding === 'latin-1' || encoding === 'latin1') {
+      encoding = 'windows-1252'; // superset de ISO-8859-1, maneja más caracteres
+    }
+
+    try {
+      const decoder = new TextDecoder(encoding);
+      return decoder.decode(bytes);
+    } catch (e) {
+      // Si el encoding no es reconocido, intentar UTF-8
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(bytes);
     }
   }
 
@@ -566,6 +610,264 @@
       </td>`;
       tableBody.appendChild(tr);
     }
+  }
+
+  // ── TILDE CORRECTION (Dictionary + LanguageTool) ────────────────────────────
+  btnAi.addEventListener('click', fixTildes);
+
+  // ── Diccionario local: apellidos, nombres y palabras frecuentes en DTE GT ──
+  const DICT = new Set([
+    // Apellidos más comunes en Guatemala
+    'ABAC','ACABAL','ACAJABÓN','ACAL','ACEVEDO','AGUILAR','AGUILERA','AGUIRRE',
+    'AJANEL','AJCÁ','AJCAC','AJCHÉ','AJCOJÓM','AJIATAZ','AJÍN','AJIQUÍN',
+    'AJPACAJÁ','AJPOP','AJQUEJAY','AJQUÍ','AJSIVINAC','AJTZALAM','AJTZIB',
+    'ALARCÓN','ALBIZÚREZ','ALDANA','ALVARADO','ÁLVAREZ','AMÉZQUITA',
+    'AJÚ','AJÚ','ARANDA','ARANGO','ARANA','ARÉVALO','ARGUETA','ARIAS',
+    'ARRIAGA','ARROYO','ASICONA','ASTURIAS','ATANASIO','AYALA','AZURDIA',
+    'BAEZA','BARILLAS','BARQUÍN','BARRERA','BARRIENTOS','BARRIOS','BATÚN',
+    'BAUTISTA','BAXÍN','BAZA','BAZAN','BAZÁN','BENITO','BERMÚDEZ',
+    'BOCH','BOLVITO','BRAN','BRAVO','BÚCARO',
+    'CABAÑAS','CABRERA','CÁCERES','CALDERÓN','CALÍ','CAMEY','CAMPOSECO',
+    'CAMPOSECO','CANEL','CARÍAS','CARRILLO','CASASOLA','CASILLO','CASTELLANOS',
+    'CASTILLO','CASTRO','CAÚ','CAXAJ','CAYAX','CEBALLOS','CEDILLO','CELADA',
+    'CHACACH','CHACÓN','CHALÍ','CHAMÁM','CHAMORRO','CHÁVEZ','CHICHÉ',
+    'CHILÍN','CHUMIL','CIFUENTES','COJOM','COJULÚN','COLINDRES','COLOCH',
+    'COLOP','COMÁN','CONTRERAS','COPA','CORADO','CORONADO','CORTÉS',
+    'COY','COYOTE','COZAL','CÚMEZ','CURRUCHICHE','CURRUCHICH',
+    'DE LA CRUZ','DE LEÓN','DEL AGUILA','DEL CÍD','DELGADO','DÍAZ',
+    'DOMINGO','DONIS','DUEÑAS',
+    'ECHEVERRÍA','ELÍAS','ENRÍQUEZ','ESCOBAR','ESPAÑA','ESPINOZA',
+    'ESQUIT','ESTRADA',
+    'FAJARDO','FARFÁN','FELICIANO','FERNÁNDEZ','FIGUEROA','FLORES',
+    'FUENTES','FÚNEZ',
+    'GALINDO','GALLARDO','GALLEGO','GÁLVEZ','GAMBOA','GARRIDO',
+    'GIRÓN','GODÍNEZ','GÓMEZ','GÓNZALEZ','GONZÁLES','GONZÁLEZ',
+    'GRAMAJO','GARCÍA','GUARCAX','GUARCHAJ','GUDIEL','GUERRA',
+    'GUTIÉRREZ','GUZMÁN',
+    'HERRERA','HERNÁNDEZ','HIGUEROS','HIDALGO',
+    'ICAL','IXCOT','IXCOY','IXMATÁ',
+    'JIMÉNEZ','JUÁREZ',
+    'LAÍNEZ','LEAL','LEIVA','LEMUS','LIMA','LINARES','LIRA',
+    'LONGO','LÓPEZ','LORENZANA','LUCRECIA','LUNA',
+    'MALDONADO','MARROQUÍN','MÁRTIR','MARTÍNEZ','MAZARIEGOS',
+    'MEDINA','MEJÍA','MÉNDEZ','MENDIZÁBAL','MENÉNDEZ','MÉRIDA',
+    'MICULAX','MIJANGOS','MOLINA','MONROY','MONTEJO','MONTERROSO',
+    'MONTÚFAR','MONZÓN','MORALES','MORÁN','MORENO','MOSCOSO',
+    'MUÑOZ',
+    'NÁJERA','NAVARRO','NIMATUJ','NORIEGA','NÚÑEZ',
+    'OCHOA','OROZCO','ORELLANA','ORDÓÑEZ','ORTEGA','ORTÍZ',
+    'OSORIO','OVALLE',
+    'PABLO','PACHECO','PALENCIA','PALMA','PAREDES','PARDO',
+    'PAZ','PÉREZ','PINEDA','PIRIR','PONCE','PORRAS','PRADO',
+    'PUAC',
+    'QUICHÉ','QUIJADA','QUIÑÓNEZ','QUIROA',
+    'RAMÍREZ','RAMOS','RECINOS','REINA','REYES','RÍOS',
+    'RIVAS','RIVERA','RODAS','RODRÍGUEZ','ROJAS','ROMERO',
+    'ROSALES','RUANO','RUBIO','RUÍZ',
+    'SAGASTUME','SALAZAR','SALGUERO','SAMAYOA','SÁNCHEZ',
+    'SANTOS','SARAVIA','SICAJÁ','SIGÜENZA','SIMILOX',
+    'SOLANO','SOLARES','SOLÍS','SOLORZANO','SOTO','SOLÓRZANO',
+    'TÁNCHEZ','TELLO','TICAS','TOLEDO','TOBAR','TOVAR',
+    'TZI','TZOC','TZUL','TZUNÚN','TZUNUNÉ',
+    'UMAÑA','URÍZAR','URQUIZÚ',
+    'VALLE','VÁSQUEZ','VANEGAS','VARGAS','VEGA','VELÁSQUEZ',
+    'VELIZ','VENTURA','VILLAGRÁN','VILLANUEVA','VILLATORO',
+    'XEC','XICARÁ','XUYÁ',
+    'YAT','YAX','YAXÓN',
+    'ZAPETA','ZELAYA','ZÚÑIGA',
+    // Palabras comunes en descripciones de DTE
+    'ADMINISTRACIÓN','AGRÍCOLA','ALQUILER','ATRASO','ANÓNIMA',
+    'COBRO','COMERCIAL','COMERCIALIZACIÓN','COMISIÓN',
+    'COMPAÑÍA','CONSTRUCCIÓN','CONTRIBUCIÓN','CUOTA',
+    'DESCRIPCIÓN','DISTRIBUCIÓN','DISTRIBUIDORA',
+    'ELÉCTRICA','EMPRESA','EXPORTACIÓN','EXPORTACIONES',
+    'FACTURA','FINANCIERO','FUNCIÓN',
+    'GESTIÓN','HONORARIOS',
+    'IMPORTACIÓN','IMPORTACIONES','INDUSTRIAL','INDUSTRIA','INFORMACIÓN',
+    'INTERÉS','INSCRIPCIÓN',
+    'JURISDICCIÓN',
+    'LIMITADA','LOGÍSTICA',
+    'MANTENIMIENTO','MENSUALIDAD','MÍNIMO',
+    'OPERACIÓN','ORGANIZACIÓN',
+    'PENSIÓN','PENDIENTE','PRODUCCIÓN','PROFESIÓN',
+    'RECEPCIÓN','RECIBO','RENTA','RESPONSABILIDAD',
+    'SALDO','SERVICIOS','SERVICIO','SOCIEDAD','SUSCRIPCIÓN',
+    'TÉCNICO','TELECOMUNICACIONES','TRANSACCIÓN','TRANSPORTE',
+    'VEHÍCULO','VENTAS',
+    // Conectores y palabras frecuentes
+    'TAMBIÉN','ADEMÁS','SEGÚN','TRAVÉS','NÚMERO',
+    'MÁS','ESTÁ','AÚN','AHÍ','ASÍ','AQUí','AQUÍ',
+    // Tipos de empresa abreviados
+    'S.A.','LTDA.','S.R.L.','CIA.','CÍAS.',
+  ]);
+
+  // Caracteres candidatos para sustituir "?"
+  // Ordenados por frecuencia en español guatemalteco
+  const ACCENT_UPPER = ['Á','É','Í','Ó','Ú','Ñ','Ü'];
+  const ACCENT_LOWER = ['á','é','í','ó','ú','ñ','ü'];
+  const ACCENT_OTHER = ['¿','¡','«','»'];
+
+  // Genera todos los candidatos sustituyendo cada "?" con acentuadas
+  function generarCandidatos(word) {
+    const isUpper = word === word.toUpperCase();
+    const chars   = isUpper ? ACCENT_UPPER : ACCENT_LOWER;
+    let results   = [word];
+
+    const qCount = (word.match(/\?/g) || []).length;
+    for (let q = 0; q < qCount; q++) {
+      const next = [];
+      for (const base of results) {
+        for (const ch of chars) {
+          next.push(base.replace('?', ch));
+        }
+        // También probar sin tilde (podría ser solo un carácter perdido no acentuado)
+        next.push(base.replace('?', ''));
+      }
+      results = next;
+      if (results.length > 2000) break; // límite de explosión combinatoria
+    }
+    return [...new Set(results)];
+  }
+
+  // Busca en el diccionario local la mejor corrección para una palabra
+  function buscarEnDiccionario(word) {
+    const upper = word.toUpperCase();
+    // Sin ?
+    if (!word.includes('?')) return word;
+    const candidatos = generarCandidatos(word);
+    // Primero buscar exacto en el diccionario
+    for (const c of candidatos) {
+      if (DICT.has(c.toUpperCase())) return c;
+    }
+    return null; // no encontrado
+  }
+
+  // Valida una palabra con LanguageTool (API gratuita, sin clave)
+  async function validarConLT(candidatos, idioma = 'es') {
+    // Probar candidatos de a varios en un solo llamado a LT
+    // mandamos el texto: cada candidato separado por salto de línea
+    const texto = candidatos.join('\n');
+    try {
+      const resp = await fetch('https://api.languagetool.org/v2/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `text=${encodeURIComponent(texto)}&language=${idioma}&disabledRules=UPPERCASE_SENTENCE_START`
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+
+      // Encontrar candidatos sin errores de ortografía
+      const erroresPorLinea = new Array(candidatos.length).fill(0);
+      for (const match of (data.matches || [])) {
+        // calcular en qué línea cae el offset
+        let offset = 0;
+        for (let i = 0; i < candidatos.length; i++) {
+          if (match.offset >= offset && match.offset < offset + candidatos[i].length) {
+            erroresPorLinea[i]++;
+            break;
+          }
+          offset += candidatos[i].length + 1; // +1 por el \n
+        }
+      }
+      // Retornar el candidato con menos errores
+      let minErr = Infinity, best = null;
+      for (let i = 0; i < candidatos.length; i++) {
+        if (erroresPorLinea[i] < minErr) {
+          minErr = erroresPorLinea[i];
+          best   = candidatos[i];
+        }
+      }
+      return best;
+    } catch {
+      return null;
+    }
+  }
+
+  // Función principal: corrige un texto completo (puede ser una frase o nombre)
+  async function corregirTexto(texto, usarLT) {
+    if (!texto.includes('?')) return texto;
+
+    // Procesar palabra por palabra
+    const partes = texto.split(/(\s+)/);
+    const resultado = [];
+
+    for (const parte of partes) {
+      if (!parte.includes('?')) { resultado.push(parte); continue; }
+
+      // 1. Buscar en diccionario local
+      const dMatch = buscarEnDiccionario(parte);
+      if (dMatch) { resultado.push(dMatch); continue; }
+
+      // 2. Fallback: LanguageTool (si está habilitado)
+      if (usarLT) {
+        const candidatos = generarCandidatos(parte).slice(0, 30); // limitar a 30
+        const ltMatch = await validarConLT(candidatos);
+        if (ltMatch) { resultado.push(ltMatch); continue; }
+      }
+
+      // 3. Último recurso: heurística (vocal más frecuente en español)
+      // á→A, é→E, etc. — reemplazar ? con la vocal más probable según posición
+      resultado.push(parte.replace(/\?/g, (_, offset, str) => {
+        const isUp = str === str.toUpperCase();
+        // Consonante antes → probable vocal con tilde
+        const prev = str[offset - 1] || '';
+        if (/[bcdfghjklmnñpqrstvwxyz]/i.test(prev)) return isUp ? 'Á' : 'á';
+        return isUp ? 'Ó' : 'ó';
+      }));
+    }
+    return resultado.join('');
+  }
+
+  async function fixTildes() {
+    const campos = ['partner_id', 'invoice_line_ids/name'];
+    const uniqSet = new Set();
+    allRows.forEach(r => campos.forEach(c => {
+      const v = String(r[c] ?? '');
+      if (v.includes('?')) uniqSet.add(v);
+    }));
+
+    if (uniqSet.size === 0) { log('ok', 'No se detectaron caracteres corruptos.'); return; }
+
+    btnAi.disabled = true;
+    btnAi.textContent = '⏳ Corrigiendo…';
+    log('ok', `Corrigiendo ${uniqSet.size} texto(s) únicos con diccionario + LanguageTool…`);
+
+    const mapa = {};
+    const textos = [...uniqSet];
+    let ltUsado = 0;
+
+    for (let i = 0; i < textos.length; i++) {
+      const original = textos[i];
+      btnAi.textContent = `⏳ ${i + 1}/${textos.length}…`;
+
+      // Intentar primero solo diccionario (rápido)
+      let corregido = await corregirTexto(original, false);
+
+      // Si aún quedan ?, usar LanguageTool como refuerzo
+      if (corregido.includes('?')) {
+        corregido = await corregirTexto(original, true);
+        ltUsado++;
+        // Pausa mínima para no saturar la API de LT
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      mapa[original] = corregido;
+    }
+
+    // Aplicar correcciones
+    let fixedCount = 0;
+    allRows = allRows.map(r => {
+      const nr = { ...r };
+      campos.forEach(c => {
+        const v = String(nr[c] ?? '');
+        if (mapa[v] && mapa[v] !== v) { nr[c] = mapa[v]; fixedCount++; }
+      });
+      return nr;
+    });
+
+    renderTable(allRows);
+    btnAi.style.display = 'none';
+    log('ok', `✅ ${fixedCount} campo(s) corregido(s). Diccionario: ${textos.length - ltUsado}, LanguageTool: ${ltUsado}.`);
   }
 
   // ── EXPORT EXCEL ────────────────────────────────────────────────────────────
